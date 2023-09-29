@@ -7,6 +7,7 @@
 #define WINDOW_HIGHT 450
 #define WINDOW_TITLE "mvisual"
 #define MAX_FPS 60
+#define FONT_SIZE 20
 
 enum class MODE
 {
@@ -15,15 +16,16 @@ enum class MODE
     VISUALATION,
 };
 
-auto calculateTextCenterPosX = [](const char* text) { return (WINDOW_WIDTH - MeasureText(text, 20)) / 2; };
+auto calculateTextCenterPosX = [](const char* text) { return (WINDOW_WIDTH - MeasureText(text, FONT_SIZE)) / 2; };
 
-Music music;
+Music musicStream;
 bool isFPSShown = false;
 auto currentMod = MODE::MUSIC_UNLOADED;
 
 void drawSimpleMode();
 void drawVisualationMode();
 void handleInput();
+void drawWelcomeText();
 
 int main(void)
 {
@@ -33,55 +35,42 @@ int main(void)
 
     while (!WindowShouldClose())
     {
-        UpdateMusicStream(music);
+        UpdateMusicStream(musicStream);
 
         handleInput();
 
         BeginDrawing();
 
-        if (isFPSShown)
-        {
-            DrawFPS(0, 0);
-        }
+        if (isFPSShown) DrawFPS(0, 0);
+        if (currentMod == MODE::SIMPLE) drawSimpleMode();
+        if (currentMod == MODE::VISUALATION) drawVisualationMode();
+        if (currentMod == MODE::MUSIC_UNLOADED) drawWelcomeText();
 
-        if (currentMod == MODE::SIMPLE)
-        {
-            drawSimpleMode();
-            EndDrawing();
-            continue;
-        }
-        if (currentMod == MODE::VISUALATION)
-        {
-            drawVisualationMode();
-            EndDrawing();
-            continue;
-        }
-        if (currentMod == MODE::MUSIC_UNLOADED)
-        {
-            ClearBackground(RAYWHITE);
-            auto text = "WELCOME TO MVISAL PLEASE DRAG AND DROP YOUR MUSIC";
-            DrawText(text, calculateTextCenterPosX(text), 20, 20, LIGHTGRAY);
-            EndDrawing();
-            continue;
-        }
+        EndDrawing();
     }
 
-    UnloadMusicStream(music);
+    UnloadMusicStream(musicStream);
     CloseAudioDevice();
     CloseWindow();
 
     return 0;
 }
 
+void drawWelcomeText()
+{
+    ClearBackground(RAYWHITE);
+    auto text = "WELCOME TO MVISAL PLEASE DRAG AND DROP YOUR MUSIC";
+    DrawText(text, calculateTextCenterPosX(text), 20, FONT_SIZE, LIGHTGRAY);
+}
 void drawSimpleMode()
 {
 
-    float timePlayed = GetMusicTimePlayed(music) / GetMusicTimeLength(music);
+    float timePlayed = GetMusicTimePlayed(musicStream) / GetMusicTimeLength(musicStream);
     if (timePlayed > 1.0f) timePlayed = 1.0;
 
     ClearBackground(RAYWHITE);
 
-    DrawText("MUSIC SHOULD BE PLAYING!", 255, 100, 20, LIGHTGRAY);
+    DrawText("MUSIC SHOULD BE PLAYING!", 255, 100, FONT_SIZE, LIGHTGRAY);
 
     DrawRectangle(200, 150, 400, 12, LIGHTGRAY);
     DrawRectangle(200, 150, (int)(timePlayed * 400.0f), 12, MAROON);
@@ -92,47 +81,45 @@ void drawSimpleMode()
     auto visualationText = "PRESS V TO ENTER VISUALATION MODE";
     auto fpsText = "PRESS F TO TOGGEL FPS";
 
-    DrawText(restartText, calculateTextCenterPosX(restartText), 200, 20, LIGHTGRAY);
-    DrawText(pauseText, calculateTextCenterPosX(pauseText), 230, 20, LIGHTGRAY);
-    DrawText(visualationText, calculateTextCenterPosX(visualationText), 260, 20, LIGHTGRAY);
-    DrawText(fpsText, calculateTextCenterPosX(fpsText), 290, 20, LIGHTGRAY);
+    DrawText(restartText, calculateTextCenterPosX(restartText), 200, FONT_SIZE, LIGHTGRAY);
+    DrawText(pauseText, calculateTextCenterPosX(pauseText), 230, FONT_SIZE, LIGHTGRAY);
+    DrawText(visualationText, calculateTextCenterPosX(visualationText), 260, FONT_SIZE, LIGHTGRAY);
+    DrawText(fpsText, calculateTextCenterPosX(fpsText), 290, FONT_SIZE, LIGHTGRAY);
 }
-
 void drawVisualationMode()
 {
     ClearBackground(RAYWHITE);
     auto text = "WELCOME TO VISUALATION MODE STILL IN DEVELEPMENT";
-    DrawText(text, calculateTextCenterPosX(text), 20, 20, LIGHTGRAY);
+    DrawText(text, calculateTextCenterPosX(text), 20, FONT_SIZE, LIGHTGRAY);
 }
-
 void handleInput()
 {
 
     if (IsFileDropped())
     {
-        UnloadMusicStream(music);
+        UnloadMusicStream(musicStream);
 
         FilePathList files = LoadDroppedFiles();
 
-        music = LoadMusicStream(files.paths[0]);
-        PlayMusicStream(music);
+        musicStream = LoadMusicStream(files.paths[0]);
+        PlayMusicStream(musicStream);
 
-        if (IsMusicStreamPlaying(music) && currentMod == MODE::MUSIC_UNLOADED) currentMod = MODE::SIMPLE;
+        if (IsMusicStreamPlaying(musicStream) && currentMod == MODE::MUSIC_UNLOADED) currentMod = MODE::SIMPLE;
 
         UnloadDroppedFiles(files);
     }
 
     if (IsKeyPressed(KEY_P) && currentMod != MODE::MUSIC_UNLOADED)
     {
-        (IsMusicStreamPlaying(music)) ? PauseMusicStream(music) : ResumeMusicStream(music);
+        (IsMusicStreamPlaying(musicStream)) ? PauseMusicStream(musicStream) : ResumeMusicStream(musicStream);
     }
-    
+
     if (IsKeyPressed(KEY_SPACE) && currentMod != MODE::MUSIC_UNLOADED)
     {
-        StopMusicStream(music);
-        PlayMusicStream(music);
+        StopMusicStream(musicStream);
+        PlayMusicStream(musicStream);
     }
-    
+
     if (IsKeyPressed(KEY_F))
     {
         isFPSShown = !isFPSShown;
