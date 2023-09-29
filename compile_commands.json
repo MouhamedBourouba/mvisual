@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/mouhamed/dev/mvisual",
+    "file": "src/main.cpp",
+    "command": "clang++ -o mvisual -ggdb -Wall -Wextra -I include/ -I/usr/local/include  src/main.cpp -L/usr/local/lib -lraylib"
+  }
+]
