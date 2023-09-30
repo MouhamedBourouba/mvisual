@@ -1,12 +1,13 @@
-#include <cstddef>
-#include <cstdio>
+#include <complex>
 #include <iostream>
 #include <raylib.h>
+#include <valarray>
+#include <vector>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HIGHT 450
 #define WINDOW_TITLE "mvisual"
-#define MAX_FPS 60
+#define MAX_FPS 70
 #define FONT_SIZE 20
 
 enum class MODE
@@ -26,12 +27,19 @@ void drawSimpleMode();
 void drawVisualationMode();
 void handleInput();
 void drawWelcomeText();
+void loadAndPlayMusic(const char* path);
+void audioCallback(void* bufferData, unsigned int frames);
 
 int main(void)
 {
     InitWindow(WINDOW_WIDTH, WINDOW_HIGHT, WINDOW_TITLE);
     InitAudioDevice();
     SetTargetFPS(MAX_FPS);
+
+    // FOR DEVELEPMENT ------------------------------------------------
+    loadAndPlayMusic("song.mp3");
+    AttachAudioStreamProcessor(musicStream.stream, audioCallback);
+    // ----------------------------------------------------------------
 
     while (!WindowShouldClose())
     {
@@ -56,6 +64,8 @@ int main(void)
     return 0;
 }
 
+/*  UI  */
+// -------------------------------------------------------------------------------------------------------------------------
 void drawWelcomeText()
 {
     ClearBackground(RAYWHITE);
@@ -64,9 +74,8 @@ void drawWelcomeText()
 }
 void drawSimpleMode()
 {
-
     float timePlayed = GetMusicTimePlayed(musicStream) / GetMusicTimeLength(musicStream);
-    if (timePlayed > 1.0f) timePlayed = 1.0;
+    if (timePlayed > 1.0f) timePlayed = 1.0f;
 
     ClearBackground(RAYWHITE);
 
@@ -92,21 +101,22 @@ void drawVisualationMode()
     auto text = "WELCOME TO VISUALATION MODE STILL IN DEVELEPMENT";
     DrawText(text, calculateTextCenterPosX(text), 20, FONT_SIZE, LIGHTGRAY);
 }
+// -------------------------------------------------------------------------------------------------------------------------
+
+/*  USER INPUT */
+// -------------------------------------------------------------------------------------------------------------------------
 void handleInput()
 {
-
     if (IsFileDropped())
     {
-        UnloadMusicStream(musicStream);
-
         FilePathList files = LoadDroppedFiles();
-
-        musicStream = LoadMusicStream(files.paths[0]);
-        PlayMusicStream(musicStream);
-
-        if (IsMusicStreamPlaying(musicStream) && currentMod == MODE::MUSIC_UNLOADED) currentMod = MODE::SIMPLE;
-
+        loadAndPlayMusic(files.paths[0]);
         UnloadDroppedFiles(files);
+    }
+
+    if (IsKeyPressed(KEY_F))
+    {
+        isFPSShown = !isFPSShown;
     }
 
     if (IsKeyPressed(KEY_P) && currentMod != MODE::MUSIC_UNLOADED)
@@ -118,11 +128,6 @@ void handleInput()
     {
         StopMusicStream(musicStream);
         PlayMusicStream(musicStream);
-    }
-
-    if (IsKeyPressed(KEY_F))
-    {
-        isFPSShown = !isFPSShown;
     }
 
     if (IsKeyPressed(KEY_V) && currentMod != MODE::MUSIC_UNLOADED)
@@ -140,3 +145,66 @@ void handleInput()
         }
     }
 }
+// -------------------------------------------------------------------------------------------------------------------------
+
+/*  UTILS */
+// -------------------------------------------------------------------------------------------------------------------------
+void loadAndPlayMusic(const char* path)
+{
+    musicStream = LoadMusicStream(path);
+    PlayMusicStream(musicStream);
+
+    if (IsMusicReady(musicStream))
+    {
+        AttachAudioStreamProcessor(musicStream.stream, audioCallback);
+        if (currentMod == MODE::MUSIC_UNLOADED) currentMod = MODE::SIMPLE;
+    }
+    else
+    {
+        currentMod = MODE::MUSIC_UNLOADED;
+    }
+}
+// -------------------------------------------------------------------------------------------------------------------------
+
+/* Audio Processing */
+// -------------------------------------------------------------------------------------------------------------------------
+
+typedef std::complex<double> Complex;
+typedef std::valarray<Complex> CArray;
+const double pi = 3.141592653589793238460;
+
+// Cooley–Tukey FFT (in-place, divide-and-conquer)
+// Higher memory requirements and redundancy although more intuitive
+// Ported From https://www.rosettacode.org/wiki/Fast_Fourier_transform#C++
+void fft(CArray& x)
+{
+    const size_t N = x.size();
+    if (N <= 1) return;
+
+    // divide
+    CArray even = x[std::slice(0, N / 2, 2)];
+    CArray odd = x[std::slice(1, N / 2, 2)];
+
+    // conquer
+    fft(even);
+    fft(odd);
+
+    // combine
+    for (size_t k = 0; k < N / 2; ++k)
+    {
+        Complex t = std::polar(1.0, -2 * pi * k / N) * odd[k];
+        x[k] = even[k] + t;
+        x[k + N / 2] = even[k] - t;
+    }
+}
+
+void audioCallback(void* bufferData, unsigned int frames)
+{
+    float(*samplesAs2DArray)[2] = reinterpret_cast<float(*)[2]>(bufferData);
+
+    for (int i = 0; i < frames; ++i)
+    {
+    }
+}
+
+// -------------------------------------------------------------------------------------------------------------------------
