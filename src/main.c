@@ -5,8 +5,8 @@
 #include <string.h>
 #include <sys/types.h>
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HIGHT 450
+#define WINDOW_WIDTH 60 * 16
+#define WINDOW_HIGHT 60 * 9
 #define WINDOW_TITLE "mvisual"
 #define MAX_FPS 70
 #define FONT_SIZE 20
@@ -41,6 +41,8 @@ typedef enum
 float inRaw[N_FFT];
 float inRawWindowed[N_FFT];
 FloatComplex outRaw[N_FFT];
+float outLog[N_FFT];
+float outSmooth[N_FFT];
 
 Music musicStream;
 bool isFPSShown = false;
@@ -49,7 +51,6 @@ MODE currentMod = MUSIC_UNLOADED;
 /* Audio Processing */
 // -------------------------------------------------------------------------------------------------------------------------
 
-// Ported From https://github.com/tsoding/musializer/blob/master/src/plug.c#L110
 void fft(float in[], size_t stride, FloatComplex out[], size_t n)
 {
 
@@ -166,21 +167,13 @@ void drawVisualationMode()
     fft(inRawWindowed, 1, outRaw, N_FFT);
 
     float ampMax = 0.00f;
+    float startF = 1.0f;
     float step = 1.06f;
-    uint segmentIndex = 0;
+    size_t m = 0;
 
-    for (size_t i = 0; i < N; ++i)
+    for (float f = startF; f < N; f = ceilf(f * step))
     {
-        float a = amp(outRaw[i]);
-        if (ampMax < a) ampMax = a;
-    }
-
-    float freqNum = logf(N / 20.0f) / logf(step) + 1.0f;
-    float segmentWidth = (float)WINDOW_WIDTH / freqNum;
-
-    for (float f = 20.0f; f < N; f = f * step)
-    {
-        float nextFreq = f * 1.06f;
+        float nextFreq = ceilf(f * 1.06f);
         float maxFreqInRange = 0;
 
         for (size_t q = (size_t)f; q < N && q < (size_t)nextFreq; q++)
@@ -189,13 +182,28 @@ void drawVisualationMode()
             if (maxFreqInRange < _f) maxFreqInRange = _f;
         }
 
-        float normalizedFreq = (maxFreqInRange) / ampMax;
-        float segmentHight = ((float)(WINDOW_HIGHT * normalizedFreq)) / 1.5;
-        int x = (int)(segmentWidth * segmentIndex);
+        if (maxFreqInRange > ampMax) ampMax = maxFreqInRange;
+        outLog[m++] = maxFreqInRange;
+    }
 
-        DrawRectangle(x, (WINDOW_HIGHT - segmentHight) + 5, segmentWidth, segmentHight, BLUE);
+    for (size_t i = 0; i < m; i++)
+    {
+        outLog[i] /= ampMax;
+    }
 
-        segmentIndex++;
+    for (size_t i = 0; i < m; i++)
+    {
+        outSmooth[i] += (outLog[i] - outSmooth[i]) * GetFrameTime() * 10;
+    }
+
+    float cellWidth = (float)WINDOW_WIDTH / m;
+
+    for (size_t i = 0; i < m; i++)
+    {
+        float x = i * cellWidth;
+        float h = outSmooth[i] * (float)WINDOW_HIGHT * 1/1.5;
+        float y = (float)WINDOW_HIGHT - h + 1;
+        DrawRectangle(x, y, cellWidth, h, BLUE);
     }
 }
 // -------------------------------------------------------------------------------------------------------------------------
