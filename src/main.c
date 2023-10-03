@@ -27,7 +27,8 @@
 #define subcc(a, b) ((a) - (b))
 #endif
 
-#define N (1 << 14)
+#define N ((1 << 14) / 2)
+#define N_FFT (1 << 14)
 
 typedef enum
 {
@@ -37,8 +38,9 @@ typedef enum
     VISUALATION,
 } MODE;
 
-float inRaw[N];
-FloatComplex outRaw[N];
+float inRaw[N_FFT];
+float inRawWindowed[N_FFT];
+FloatComplex outRaw[N_FFT];
 
 Music musicStream;
 bool isFPSShown = false;
@@ -46,7 +48,6 @@ MODE currentMod = MUSIC_UNLOADED;
 
 /* Audio Processing */
 // -------------------------------------------------------------------------------------------------------------------------
-#define mM_PI (3.14159265358979323846)
 
 // Ported From https://github.com/tsoding/musializer/blob/master/src/plug.c#L110
 void fft(float in[], size_t stride, FloatComplex out[], size_t n)
@@ -111,10 +112,10 @@ void loadAndPlayMusic(const char* path)
 }
 
 static inline float amp(FloatComplex z)
-{
-    float a = crealf(z);
-    float b = cimagf(z);
-    return logf(a * a + b * b);
+{   
+    float a = cfromreal(z);
+    float b = cfromimag(z);
+    return logf(a*a + b*b);
 }
 
 // -------------------------------------------------------------------------------------------------------------------------
@@ -155,9 +156,16 @@ void drawVisualationMode()
     ClearBackground(RAYWHITE);
     drawHorizentalyCenteredText("WELCOME TO VISUALATION MODE STILL IN DEVELEPMENT", 20);
 
-    fft(inRaw, 1, outRaw, N);
+    for (int i = 0; i < N_FFT; ++i)
+    {
+        float t = (float)i / N_FFT;
+        float hann = 0.5 - 2*cosf(2*PI*t);
+        inRawWindowed[i] = inRaw[i] * hann;
+    }
 
-    float ampMax = 0.00f; 
+    fft(inRawWindowed, 1, outRaw, N_FFT);
+
+    float ampMax = 0.00f;
     for (size_t i = 0; i < N; ++i)
     {
         float a = amp(outRaw[i]);
@@ -165,26 +173,24 @@ void drawVisualationMode()
     }
 
     uint m = 0;
-    float fn = logf((N / 20.0f)) / logf(1.06f) + 1.0f;
+    float fn = logf((N / 17.0f)) / logf(1.06f) + 1.0f;
     float w = (float)WINDOW_WIDTH / fn;
 
-    for (float f = 20.0f; f < N; f *= 1.06f)
+    for (float f = 17.0f; f < N; f = f*1.06f)
     {
-        float f1 = f * 1.06f;
+        float f1 = f*1.06f;
         float ft = 0;
 
         for (size_t q = (size_t)f; q < N && q < (size_t)f1; q++)
         {
-            ft += amp(outRaw[q]);
+            float _f = amp(outRaw[q]);
+            if (ft < _f) ft = _f;
         }
 
-        if ((f1 - f + 1) > 0)
-        {
-            float t = (ft / (f1 - f + 1)) / ampMax;
-            float h = (float)WINDOW_HIGHT / 2 * t;
-            int x = (int)(w * m);
-            DrawRectangle(x, WINDOW_HIGHT - (int)h, (int)w, (int)h, BLUE);
-        }
+        float t = (ft) / ampMax;
+        float h = ((float)(WINDOW_HIGHT * t)) / 1.5;
+        int x = (int)(w * m);
+        DrawRectangle(x, WINDOW_HIGHT - (int)h, (int)w, (int)h, BLUE);
 
         m++;
     }
