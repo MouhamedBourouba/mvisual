@@ -112,10 +112,10 @@ void loadAndPlayMusic(const char* path)
 }
 
 static inline float amp(FloatComplex z)
-{   
+{
     float a = cfromreal(z);
     float b = cfromimag(z);
-    return logf(a*a + b*b);
+    return logf(a * a + b * b);
 }
 
 // -------------------------------------------------------------------------------------------------------------------------
@@ -158,78 +158,44 @@ void drawVisualationMode()
 
     for (int i = 0; i < N_FFT; ++i)
     {
-        float t = (float)i / N_FFT;
-        float hann = 0.5 - 2*cosf(2*PI*t);
+        float t = (float)i / N_FFT - 1;
+        float hann = 0.5 - 2 * cosf(2 * PI * t);
         inRawWindowed[i] = inRaw[i] * hann;
     }
 
     fft(inRawWindowed, 1, outRaw, N_FFT);
 
     float ampMax = 0.00f;
+    float step = 1.06f;
+    uint segmentIndex = 0;
+
     for (size_t i = 0; i < N; ++i)
     {
         float a = amp(outRaw[i]);
         if (ampMax < a) ampMax = a;
     }
 
-    uint m = 0;
-    float fn = logf((N / 17.0f)) / logf(1.06f) + 1.0f;
-    float w = (float)WINDOW_WIDTH / fn;
+    float freqNum = logf(N / 20.0f) / logf(step) + 1.0f;
+    float segmentWidth = (float)WINDOW_WIDTH / freqNum;
 
-    for (float f = 17.0f; f < N; f = f*1.06f)
+    for (float f = 20.0f; f < N; f = f * step)
     {
-        float f1 = f*1.06f;
-        float ft = 0;
+        float nextFreq = f * 1.06f;
+        float maxFreqInRange = 0;
 
-        for (size_t q = (size_t)f; q < N && q < (size_t)f1; q++)
+        for (size_t q = (size_t)f; q < N && q < (size_t)nextFreq; q++)
         {
             float _f = amp(outRaw[q]);
-            if (ft < _f) ft = _f;
+            if (maxFreqInRange < _f) maxFreqInRange = _f;
         }
 
-        float t = (ft) / ampMax;
-        float h = ((float)(WINDOW_HIGHT * t)) / 1.5;
-        int x = (int)(w * m);
-        DrawRectangle(x, WINDOW_HIGHT - (int)h, (int)w, (int)h, BLUE);
+        float normalizedFreq = (maxFreqInRange) / ampMax;
+        float segmentHight = ((float)(WINDOW_HIGHT * normalizedFreq)) / 1.5;
+        int x = (int)(segmentWidth * segmentIndex);
 
-        m++;
-    }
-}
-// -------------------------------------------------------------------------------------------------------------------------
+        DrawRectangle(x, (WINDOW_HIGHT - segmentHight) + 5, segmentWidth, segmentHight, BLUE);
 
-/*  USER INPUT */
-// -------------------------------------------------------------------------------------------------------------------------
-void handleInput()
-{
-    if (IsFileDropped())
-    {
-        FilePathList files = LoadDroppedFiles();
-        loadAndPlayMusic(files.paths[0]);
-        UnloadDroppedFiles(files);
-    }
-
-    if (IsKeyPressed(KEY_F))
-    {
-        isFPSShown = !isFPSShown;
-    }
-
-    if (IsKeyPressed(KEY_P) && currentMod != MUSIC_UNLOADED && currentMod != ERROR_LOADING_MUSIC)
-    {
-        (IsMusicStreamPlaying(musicStream)) ? PauseMusicStream(musicStream) : ResumeMusicStream(musicStream);
-    }
-
-    if (IsKeyPressed(KEY_SPACE) && currentMod != MUSIC_UNLOADED && currentMod != ERROR_LOADING_MUSIC)
-    {
-        StopMusicStream(musicStream);
-        PlayMusicStream(musicStream);
-    }
-
-    if (IsKeyPressed(KEY_V) && currentMod != MUSIC_UNLOADED && currentMod != ERROR_LOADING_MUSIC)
-    {
-        if (currentMod == VISUALATION)
-            currentMod = SIMPLE;
-        else if (currentMod == SIMPLE)
-            currentMod = VISUALATION;
+        segmentIndex++;
     }
 }
 // -------------------------------------------------------------------------------------------------------------------------
@@ -250,7 +216,36 @@ int main(void)
     {
         UpdateMusicStream(musicStream);
 
-        handleInput();
+        if (IsFileDropped())
+        {
+            FilePathList files = LoadDroppedFiles();
+            loadAndPlayMusic(files.paths[0]);
+            UnloadDroppedFiles(files);
+        }
+
+        if (IsKeyPressed(KEY_F))
+        {
+            isFPSShown = !isFPSShown;
+        }
+
+        if (IsKeyPressed(KEY_P) && (currentMod == SIMPLE || currentMod == VISUALATION))
+        {
+            (IsMusicStreamPlaying(musicStream)) ? PauseMusicStream(musicStream) : ResumeMusicStream(musicStream);
+        }
+
+        if (IsKeyPressed(KEY_SPACE) && (currentMod == SIMPLE || currentMod == VISUALATION))
+        {
+            StopMusicStream(musicStream);
+            PlayMusicStream(musicStream);
+        }
+
+        if (IsKeyPressed(KEY_V) && (currentMod == SIMPLE || currentMod == VISUALATION))
+        {
+            if (currentMod == VISUALATION)
+                currentMod = SIMPLE;
+            else if (currentMod == SIMPLE)
+                currentMod = VISUALATION;
+        };
 
         BeginDrawing();
 
