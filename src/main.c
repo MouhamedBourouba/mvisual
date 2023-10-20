@@ -27,8 +27,8 @@
 #define subcc(a, b) ((a) - (b))
 #endif
 
-#define N ((1 << 14) / 2)
 #define N_FFT (1 << 14)
+#define N (size_t)((float)N_FFT / 2)
 
 typedef enum
 {
@@ -99,11 +99,11 @@ void audioCallback(void* bufferData, unsigned int frames)
 void loadAndPlayMusic(const char* path)
 {
     musicStream = LoadMusicStream(path);
-    PlayMusicStream(musicStream);
 
     if (IsMusicReady(musicStream))
     {
         AttachAudioStreamProcessor(musicStream.stream, audioCallback);
+        PlayMusicStream(musicStream);
         if (currentMod == MUSIC_UNLOADED || currentMod == ERROR_LOADING_MUSIC) currentMod = SIMPLE;
     }
     else
@@ -141,11 +141,11 @@ void drawSimpleMode()
 
     ClearBackground(RAYWHITE);
 
-    DrawText("MUSIC SHOULD BE PLAYING!", 255, 100, FONT_SIZE, LIGHTGRAY);
+    drawHorizentalyCenteredText("MUSIC SHOULD BE PLAYING!", 100);
 
-    DrawRectangle(200, 150, 400, 12, LIGHTGRAY);
-    DrawRectangle(200, 150, (int)(timePlayed * 400.0f), 12, MAROON);
-    DrawRectangleLines(200, 150, 400, 12, GRAY);
+    DrawRectangle((WINDOW_WIDTH - 400) / 2, 150, 400, 12, LIGHTGRAY);
+    DrawRectangle((WINDOW_WIDTH - 400) / 2, 150, (int)(timePlayed * 400.0f), 12, MAROON);
+    DrawRectangleLines((WINDOW_WIDTH - 400) / 2, 150, 400, 12, GRAY);
 
     drawHorizentalyCenteredText("PRESS SPACE TO RESTART MUSIC", 200);
     drawHorizentalyCenteredText("PRESS P TO PAUSE/RESUME MUSIC", 230);
@@ -155,7 +155,7 @@ void drawSimpleMode()
 void drawVisualationMode()
 {
     ClearBackground(RAYWHITE);
-    drawHorizentalyCenteredText("WELCOME TO VISUALATION MODE STILL IN DEVELEPMENT", 20);
+    drawHorizentalyCenteredText("WELCOME TO VISUALIZATION MODE STILL IN DEVELOPMENT", 20);
 
     for (int i = 0; i < N_FFT; ++i)
     {
@@ -193,17 +193,23 @@ void drawVisualationMode()
 
     for (size_t i = 0; i < m; i++)
     {
-        outSmooth[i] += (outLog[i] - outSmooth[i]) * GetFrameTime() * 10;
+        float smoothness = 8;
+        outSmooth[i] += (outLog[i] - outSmooth[i]) * smoothness * GetFrameTime();
+        if (outSmooth[i] < 0) outSmooth[i] = 0;
     }
 
-    float cellWidth = (float)WINDOW_WIDTH / m;
+    float cellWidth = ceilf((float)WINDOW_WIDTH / m);
 
     for (size_t i = 0; i < m; i++)
     {
         float x = i * cellWidth;
-        float h = outSmooth[i] * (float)WINDOW_HIGHT * 1/1.5;
+        float h =  outSmooth[i] * (float)WINDOW_HIGHT * (1 / 1.5);
         float y = (float)WINDOW_HIGHT - h + 1;
-        DrawRectangle(x, y, cellWidth, h, BLUE);
+        int hue = (float)i / m * 360;
+        float satiration = 0.8f;
+        float value = 1.0f;
+        Color color = ColorFromHSV(hue, satiration, value);
+        DrawRectangle(x, y, cellWidth, h, color);
     }
 }
 // -------------------------------------------------------------------------------------------------------------------------
@@ -213,12 +219,16 @@ int main(void)
     InitWindow(WINDOW_WIDTH, WINDOW_HIGHT, WINDOW_TITLE);
     InitAudioDevice();
     SetTargetFPS(MAX_FPS);
-
-    // FOR DEVELEPMENT ------------------------------------------------
-    loadAndPlayMusic("song.mp3");
+    musicStream = LoadMusicStream("song.mp3");
+    PlayMusicStream(musicStream);
     AttachAudioStreamProcessor(musicStream.stream, audioCallback);
-    // SetMusicVolume(musicStream, 0.0f);
-    // ----------------------------------------------------------------
+    currentMod = SIMPLE;
+
+    for (size_t i = 0; i < N_FFT; ++i)
+    {
+        inRaw[i] = 0;
+        outSmooth[i] = 0;
+    }
 
     while (!WindowShouldClose())
     {
@@ -259,9 +269,9 @@ int main(void)
 
         if (isFPSShown) DrawFPS(0, 0);
         if (currentMod == SIMPLE) drawSimpleMode();
-        if (currentMod == VISUALATION) drawVisualationMode();
-        if (currentMod == MUSIC_UNLOADED) drawTitle("DRAG & DROP TO LOAD MUSIC");
-        if (currentMod == ERROR_LOADING_MUSIC) drawTitle("ERROR Loading Music");
+        else if (currentMod == VISUALATION) drawVisualationMode();
+        else if (currentMod == MUSIC_UNLOADED) drawTitle("DRAG & DROP TO LOAD MUSIC");
+        else if (currentMod == ERROR_LOADING_MUSIC) drawTitle("ERROR Loading Music");
 
         EndDrawing();
     }
