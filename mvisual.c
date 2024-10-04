@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define WINDOW_WIDTH 1920
-#define WINDOW_HIGHT 1080
+#define WINDOW_WIDTH 1080
+#define WINDOW_HIGHT 700
 #define WINDOW_TITLE "mvisual"
 #define MAX_FPS 70
 #define FONT_SIZE 20
@@ -90,6 +90,12 @@ void audioCallback(void* bufferData, unsigned int frames)
     }
 }
 
+static inline float amp(FloatComplex z)
+{
+    float a = cfromreal(z);
+    float b = cfromimag(z);
+    return logf(a * a + b * b);
+}
 // -------------------------------------------------------------------------------------------------------------------------
 
 /*  UTILS */
@@ -110,14 +116,6 @@ void loadAndPlayMusic(const char* path)
         currentMod = ERROR_LOADING_MUSIC;
     }
 }
-
-static inline float amp(FloatComplex z)
-{
-    float a = cfromreal(z);
-    float b = cfromimag(z);
-    return logf(a * a + b * b);
-}
-
 // -------------------------------------------------------------------------------------------------------------------------
 
 /*  UI  */
